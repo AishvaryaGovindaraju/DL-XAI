@@ -137,7 +137,7 @@ CDC Diabetes Dataset
 ┌──────────────────────────────────────────────────┐
 │          Uncertainty Stratification              │
 │                                                  │
-│  LOW     σ² < 0.05   → model is confident       │
+│  LOW     σ² < 0.05   → model is confident        │
 │  MEDIUM  0.05–0.15   → moderate uncertainty      │
 │  HIGH    σ² > 0.15   → model is uncertain        │
 │                                                  │
@@ -661,7 +661,7 @@ project/
 | matplotlib | latest | Figures |
 | seaborn | latest | Figure styling |
 
-**Colab note:** All above run on free Google Colab GPU. DNN training on this dataset takes ~15–25 minutes on Colab T4. Save checkpoint to Google Drive after Phase 4 to avoid losing it on session timeout.
+**Antigravity:** All above now run on antigravity. DNN training on this dataset takes ~15–25 minutes on antigravity.
 
 ---
 
