@@ -60,6 +60,19 @@ Sep 2026 — do not propose scope changes to this doc without the user asking).
   These notebooks are **not standalone-runnable** — no re-import/re-setup
   boilerplate was added, they assume the same kernel state as running
   `DL_XAI.ipynb` cells in original order.
+- `project/src/*.py` — as of 2026-09-22, the **modular refactor** of the
+  notebook code: `config.py`, `data_loading.py`, `preprocessing.py`,
+  `model.py`, `training.py`, `evaluation.py`, `mc_dropout.py`,
+  `stratification.py`, `explain_shap.py`, `explain_lime.py`,
+  `explain_dice.py`, `run_pipeline.py`, plus `project/src/README.md`.
+  Unlike the notebooks these ARE standalone-runnable
+  (`python run_pipeline.py [--stages ...]`) and keep only the final code
+  path — the superseded `DiabetesDNN`, the `BCEWithLogitsLoss` variant and
+  the two abandoned stratification attempts are dropped. Three deliberate
+  divergences (single model, BatchNorm-in-eval MC Dropout, percentile
+  strata) are documented in `project/src/README.md`; the MC Dropout one
+  contradicts the `model.train()` invariant below — the notebooks' final
+  run used eval mode, so that is what the modules implement.
 - `UA_XAI_FINAL_PRD.md` (repo root) — frozen spec, phase-by-phase prompts and
   verify-criteria. Treat as source of truth for "what should happen."
 - `project/` (other subfolders: `src/{preprocessing,models,xai,evaluation,
