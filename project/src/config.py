@@ -1,11 +1,12 @@
 """
 config.py
 =========
-Single source of truth for every path, constant and hyper-parameter used by
-the UA-XAI pipeline. No other file is allowed to hard-code a number or a path.
+Single source of truth for paths, datasets, hyper-parameters and the
+risk-control settings. Nothing else in the project hard-codes a number.
 
-Read this file first: it tells you what the pipeline is made of before you
-read how any of it works.
+Project: Conformal Selective Explanation (CSE) - deciding per patient which
+post-hoc explanation to deliver, or to abstain, with a distribution-free
+bound on the quality of what is delivered.
 """
 
 from pathlib import Path
@@ -15,7 +16,6 @@ import numpy as np
 
 # ---------------------------------------------------------------------
 # 1. Paths
-#    project/src/config.py -> parents[0]=src, [1]=project, [2]=repo root
 # ---------------------------------------------------------------------
 
 SRC_DIR = Path(__file__).resolve().parent
@@ -24,119 +24,148 @@ REPO_ROOT = PROJECT_DIR.parent
 
 RAW_DIR = PROJECT_DIR / "data" / "raw"
 PROCESSED_DIR = PROJECT_DIR / "data" / "processed"
-MODELS_DIR = SRC_DIR / "models"
 RESULTS_DIR = PROJECT_DIR / "results"
 XAI_DIR = RESULTS_DIR / "xai_outputs"
+MODELS_DIR = RESULTS_DIR / "models"
 FIGURES_DIR = PROJECT_DIR / "figures"
-
-RAW_CSV = RAW_DIR / "diabetes_binary_health_indicators_BRFSS2015.csv"
-
-SCALER_PATH = MODELS_DIR / "scaler.pkl"
-CHECKPOINT_PATH = RESULTS_DIR / "dnn_checkpoint.pt"
-DNN_METRICS_PATH = RESULTS_DIR / "dnn_metrics.csv"
-TEST_PREDICTIONS_PATH = RESULTS_DIR / "test_predictions.csv"
-
-STRATIFICATION_PATH = PROCESSED_DIR / "uncertainty_stratification.csv"
-STRATIFIED_SAMPLES_PATH = PROCESSED_DIR / "stratified_samples.csv"
-
-SHAP_VALUES_PATH = XAI_DIR / "shap_values.npy"
-SHAP_IDS_PATH = XAI_DIR / "shap_instance_ids.npy"
-LIME_OUTPUTS_PATH = XAI_DIR / "lime_outputs.pkl"
-DICE_OUTPUTS_PATH = XAI_DIR / "dice_outputs.pkl"
-
-# The original notebook ran in a hosted sandbox and downloaded its outputs to
-# the repo root, so older result files live there instead of the PRD paths
-# above. resolve_input() reads whichever copy actually exists.
-LEGACY_OUTPUT_DIR = REPO_ROOT
-
-
-def resolve_input(path: Path) -> Path:
-    """Return `path` if it exists, else the legacy repo-root copy of it."""
-    path = Path(path)
-    if path.exists():
-        return path
-    legacy = LEGACY_OUTPUT_DIR / path.name
-    return legacy if legacy.exists() else path
+TABLES_DIR = RESULTS_DIR / "tables"
 
 
 def ensure_dirs() -> None:
-    """Create every output directory the pipeline writes into."""
-    for directory in (PROCESSED_DIR, MODELS_DIR, RESULTS_DIR, XAI_DIR, FIGURES_DIR):
-        directory.mkdir(parents=True, exist_ok=True)
+    for d in (RAW_DIR, PROCESSED_DIR, RESULTS_DIR, XAI_DIR, MODELS_DIR,
+              FIGURES_DIR, TABLES_DIR):
+        d.mkdir(parents=True, exist_ok=True)
 
 
 # ---------------------------------------------------------------------
-# 2. Dataset
+# 2. Datasets
+#    Three clinical tabular tasks spanning a deliberate size gradient
+#    (254k -> 102k -> 9k). Smaller n means more epistemic uncertainty,
+#    which is the axis this study is about.
 # ---------------------------------------------------------------------
 
-TARGET_COLUMN = "Diabetes_binary"
-N_FEATURES = 21
+DATASETS = {
+    "brfss": {
+        "name": "CDC BRFSS2015 Diabetes Health Indicators",
+        "file": RAW_DIR / "diabetes_binary_health_indicators_BRFSS2015.csv",
+        "url": None,                      # already in the repo
+        "target": "Diabetes_binary",
+        "positive_meaning": "diabetes or prediabetes",
+        "character": "population survey, self-reported, coarse features",
+    },
+    "diabetes130": {
+        "name": "UCI Diabetes 130-US Hospitals (1999-2008)",
+        "file": RAW_DIR / "diabetes130.csv",
+        "url": "https://archive.ics.uci.edu/static/public/296/data.csv",
+        "target": "readmitted",           # recoded to <30-day readmission
+        "positive_meaning": "readmitted within 30 days",
+        "character": "hospital administrative records, many categoricals",
+    },
+    "support2": {
+        "name": "UCI SUPPORT2 (seriously ill hospitalised adults)",
+        "file": RAW_DIR / "support2.csv",
+        "url": "https://archive.ics.uci.edu/static/public/880/data.csv",
+        "target": "hospdead",
+        "positive_meaning": "in-hospital death",
+        "character": "ICU physiology, heavy missingness, small n",
+    },
+}
 
-# Only these four features are continuous enough to standardise; the other
-# 17 are binary or ordinal codes and are fed to the network as-is.
-SCALED_FEATURES = ["BMI", "MentHlth", "PhysHlth", "Age"]
+DEFAULT_DATASETS = ["brfss", "diabetes130", "support2"]
 
-# 70 / 15 / 15 stratified split.
-TEST_VAL_FRACTION = 0.30
-VAL_SHARE_OF_TEMP = 0.50
+# train / val / calibration / test. The calibration split is what makes the
+# conformal guarantee possible: never used for training or for reporting.
+SPLIT_FRACTIONS = {"train": 0.60, "val": 0.10, "calib": 0.15, "test": 0.15}
 
 # ---------------------------------------------------------------------
-# 3. Deep network and training
+# 3. Models
 # ---------------------------------------------------------------------
 
 RANDOM_STATE = 42
+SEEDS = [0, 1, 2]                 # repeated runs; --seeds overrides
 
-HIDDEN_UNITS = (128, 64, 32)
-DROPOUT_RATES = (0.3, 0.3, 0.2)
+MLP_HIDDEN = (256, 128, 64)
+MLP_DROPOUT = 0.3
 
-BATCH_SIZE = 256
+FTT_D_TOKEN = 64                  # FT-Transformer token width
+FTT_N_BLOCKS = 3
+FTT_N_HEADS = 8
+FTT_DROPOUT = 0.1
+
+BATCH_SIZE = 512
 LEARNING_RATE = 1e-3
-MAX_EPOCHS = 100
-EARLY_STOPPING_PATIENCE = 10
+WEIGHT_DECAY = 1e-5
+MAX_EPOCHS = 60
+EARLY_STOPPING_PATIENCE = 8
 DECISION_THRESHOLD = 0.5
 
-# PRD gate: below this test ROC-AUC the later phases must not be run.
-MIN_ACCEPTABLE_AUC = 0.72
-
 # ---------------------------------------------------------------------
-# 4. Monte Carlo Dropout and uncertainty strata
+# 4. Uncertainty quantification
 # ---------------------------------------------------------------------
 
-MC_PASSES = 50                 # T stochastic forward passes
-
-# Fixed variance cut-points from the PRD, kept for the diagnostic comparison
-# in stratification.py. The pipeline itself uses equal-sized percentile
-# strata because the observed variances never reach these values.
-PRD_THRESHOLDS = (0.05, 0.15)
-PRD_ADJUSTED_THRESHOLDS = (0.03, 0.10)
-
-STRATUM_NAMES = ("LOW", "MEDIUM", "HIGH")
-MIN_STRATUM_SIZE = 150         # PRD minimum before a stratum is usable
-SAMPLES_PER_STRATUM = 200      # 3 x 200 = 600 explained instances
+MC_PASSES = 50                    # T stochastic forward passes
+ENSEMBLE_SIZE = 5                 # deep-ensemble members
+CALIBRATION_BINS = 15             # for ECE / reliability diagrams
 
 # ---------------------------------------------------------------------
-# 5. XAI methods
+# 5. Explanations
 # ---------------------------------------------------------------------
 
-SHAP_BACKGROUND_SIZE = 500
-
-LIME_NUM_FEATURES = N_FEATURES
-LIME_DISCRETIZE_CONTINUOUS = False
-
-DICE_METHOD = "random"
+N_EXPLAIN = 300                   # instances explained per dataset per seed
+SHAP_BACKGROUND_SIZE = 100
+LIME_NUM_SAMPLES = 2000
+IG_STEPS = 32
 DICE_TOTAL_CFS = 3
-DICE_IMMUTABLE_FEATURES = ["Age", "Sex", "Education"]
+DICE_METHOD = "random"
 
-# Conditional assignment policy the paper evaluates (PRD Part 7).
-XAI_ASSIGNMENT_POLICY = {"LOW": "SHAP", "MEDIUM": "LIME", "HIGH": "DiCE"}
+# Features a counterfactual may never change (per dataset).
+IMMUTABLE_FEATURES = {
+    "brfss": ["Age", "Sex", "Education"],
+    "diabetes130": ["age", "gender", "race"],
+    "support2": ["age", "sex", "race"],
+}
 
+ATTRIBUTION_METHODS = ["shap", "lime", "ig"]
+COUNTERFACTUAL_METHODS = ["dice"]
+ALL_METHODS = ATTRIBUTION_METHODS + COUNTERFACTUAL_METHODS
+
+# Explanation-risk estimation
+INFIDELITY_SAMPLES = 20           # perturbations per instance
+INFIDELITY_NOISE = 0.20           # std of the Gaussian perturbation
+STABILITY_NEIGHBOURS = 5          # re-explanations per instance
+STABILITY_RADIUS = 0.10           # epsilon-ball radius (scaled space)
+
+# Weights combining the normalised components into one risk in [0, 1].
+RISK_WEIGHTS_ATTRIBUTION = {"infidelity": 0.5, "instability": 0.5}
+RISK_WEIGHTS_COUNTERFACTUAL = {"invalidity": 0.6, "proximity": 0.2, "sparsity": 0.2}
 
 # ---------------------------------------------------------------------
-# 6. Reproducibility
+# 6. Selective explanation / conformal risk control
+# ---------------------------------------------------------------------
+
+RISK_LEVELS = [0.05, 0.10, 0.15, 0.20, 0.30]   # alpha sweep
+DEFAULT_ALPHA = 0.10
+QUALITY_HEAD_HIDDEN = (64, 32)
+QUALITY_HEAD_EPOCHS = 60
+QUALITY_HEAD_LR = 1e-3
+
+POLICIES = ["fixed_shap", "fixed_lime", "fixed_ig", "fixed_dice",
+            "random", "uncertainty_gating", "cse", "oracle"]
+
+# ---------------------------------------------------------------------
+# 7. Statistics
+# ---------------------------------------------------------------------
+
+N_BOOTSTRAP = 2000
+CI_LEVEL = 0.95
+ALPHA_SIGNIFICANCE = 0.05
+MULTIPLICITY_CORRECTION = "holm"
+
+# ---------------------------------------------------------------------
+# 8. Reproducibility
 # ---------------------------------------------------------------------
 
 def set_seeds(seed: int = RANDOM_STATE) -> None:
-    """Seed python, numpy and torch so a run can be reproduced."""
     random.seed(seed)
     np.random.seed(seed)
     try:
@@ -147,24 +176,13 @@ def set_seeds(seed: int = RANDOM_STATE) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-# =====================================================================
-# Checklist - what this file does
-# ---------------------------------------------------------------------
-# [x] Derives every folder path from the location of this file (no absolute
-#     paths, so the repo can be moved or cloned anywhere).
-# [x] Names each input and output artefact once: raw CSV, scaler, DNN
-#     checkpoint, stratified sample, SHAP / LIME / DiCE outputs.
-# [x] resolve_input() falls back to the repo-root copies produced by the
-#     original hosted-notebook runs, so old results still load.
-# [x] ensure_dirs() creates the output folders before anything writes.
-# [x] Holds all dataset constants (target column, the 4 scaled features,
-#     70/15/15 split fractions).
-# [x] Holds all model and training hyper-parameters (layer sizes, dropout,
-#     batch size, learning rate, epochs, patience, the 0.72 AUC gate).
-# [x] Holds MC Dropout settings (T = 50), stratum settings (3 strata, 200
-#     sampled per stratum, 150 minimum) and the PRD variance thresholds
-#     kept only for the diagnostic comparison.
-# [x] Holds XAI settings (SHAP background size, LIME options, DiCE method,
-#     the 3 immutable features) and the LOW/MEDIUM/HIGH -> XAI policy.
-# [x] set_seeds() seeds python, numpy and torch from one place.
-# =====================================================================
+# ============================================================
+# CHECKLIST
+# - Defines every path; ensure_dirs() creates the output tree
+# - Registers the three clinical datasets (BRFSS, Diabetes-130, SUPPORT2)
+#   with targets, download URLs and immutable features
+# - Sets the 60/10/15/15 train/val/calibration/test split; the calibration
+#   split exists solely to support the conformal guarantee
+# - Holds all model, training, UQ, explanation and risk-control constants
+# - set_seeds() seeds python, numpy and torch from one place
+# ============================================================
