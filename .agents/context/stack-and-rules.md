@@ -60,24 +60,31 @@ Sep 2026 — do not propose scope changes to this doc without the user asking).
   These notebooks are **not standalone-runnable** — no re-import/re-setup
   boilerplate was added, they assume the same kernel state as running
   `DL_XAI.ipynb` cells in original order.
-- `project/src/*.py` — as of 2026-09-22, the **modular refactor** of the
-  notebook code: `config.py`, `data_loading.py`, `preprocessing.py`,
-  `model.py`, `training.py`, `evaluation.py`, `mc_dropout.py`,
-  `stratification.py`, `explain_shap.py`, `explain_lime.py`,
-  `explain_dice.py`, `run_pipeline.py`, plus `project/src/README.md`.
-  Unlike the notebooks these ARE standalone-runnable
-  (`python run_pipeline.py [--stages ...]`) and keep only the final code
-  path — the superseded `DiabetesDNN`, the `BCEWithLogitsLoss` variant and
-  the two abandoned stratification attempts are dropped. Three deliberate
-  divergences (single model, BatchNorm-in-eval MC Dropout, percentile
-  strata) are documented in `project/src/README.md`; the MC Dropout one
-  contradicts the `model.train()` invariant below — the notebooks' final
-  run used eval mode, so that is what the modules implement.
-- `UA_XAI_FINAL_PRD.md` (repo root) — frozen spec, phase-by-phase prompts and
-  verify-criteria. Treat as source of truth for "what should happen."
-- `project/` (other subfolders: `src/{preprocessing,models,xai,evaluation,
-  statistics}`, `data/{raw,processed}`, `results/xai_outputs`, `figures/`,
-  `paper/`) — still empty `.gitkeep` stubs. **Do not assume code lives here.**
+- `project/src/*.py` — as of 2026-09-22 (second refactor, same day), the
+  **Conformal Selective Explanation (CSE)** implementation: `config.py`,
+  `data.py`, `models.py`, `training.py`, `uq_methods.py`, `evaluation.py`,
+  `xai.py`, `xai_metrics.py`, `selective.py`, `statistical_tests.py`,
+  `experiments.py`, `figures.py`, `run_pipeline.py`, plus
+  `project/src/README.md`. Standalone-runnable:
+  `python run_pipeline.py [--smoke|--describe|--datasets …]`.
+  `project/src/_v1_modules/` holds the earlier uncertainty-stratification
+  refactor plus the old empty package dirs; nothing imports it.
+  **Naming trap:** the module is `statistical_tests.py`, not
+  `statistics.py`, because the latter shadows the stdlib module on
+  sys.path. The old empty dirs `src/{models,xai,evaluation,statistics,
+  preprocessing}` were moved into `_v1_modules/legacy_dirs/` for the same
+  reason — as namespace packages they shadowed the new modules.
+- `CSE_PRD_v2.md` (repo root) — **current** spec. Supersedes
+  `UA_XAI_FINAL_PRD.md`, which is kept only as history: its central claim
+  is preempted (arXiv 2603.29915, 2507.12913) and its σ² thresholds put
+  every BRFSS instance in LOW. `UA_XAI_AUDIT_AND_PLANS.md` records the
+  evidence for that decision.
+- `project/data/raw/` — `diabetes_binary_health_indicators_BRFSS2015.csv`
+  plus `diabetes130.csv` and `support2.csv` downloaded from UCI
+  (`archive.ics.uci.edu/static/public/{296,880}/data.csv`); `data.py`
+  re-downloads them if missing.
+- `project/` (other subfolders: `data/processed`, `results/{tables,
+  xai_outputs,models}`, `figures/`, `paper/`) — outputs land here.
 - Root-level `*.npy` / `*.pkl` / `*.csv` (e.g. `shap_values.npy`,
   `lime_outputs.pkl`, `dice_outputs.pkl`, `stratified_samples.csv`) are the
   actual Phase 5–6C outputs, saved at repo root rather than the

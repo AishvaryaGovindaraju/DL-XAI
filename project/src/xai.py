@@ -96,7 +96,17 @@ def make_shap_explainer(predictor, dataset, background_size=config.SHAP_BACKGROU
                                   replace=False)]
 
     if getattr(predictor, "is_deep", False):
-        explainer = shap.GradientExplainer(predictor.module,
+        # GradientExplainer indexes the output as (n, n_outputs); the
+        # networks return (n,), so re-add the trailing axis.
+        class _TwoDimensional(torch.nn.Module):
+            def __init__(self, module):
+                super().__init__()
+                self.module = module
+
+            def forward(self, x):
+                return self.module(x).unsqueeze(-1)
+
+        explainer = shap.GradientExplainer(_TwoDimensional(predictor.module),
                                            torch.as_tensor(background))
 
         def explain_batch(X):

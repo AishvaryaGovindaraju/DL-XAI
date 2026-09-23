@@ -399,6 +399,11 @@ def run_all(dataset_keys=None, architectures=("mlp",), seeds=None,
                     collected.setdefault(name, []).append(table)
     merged = {name: pd.concat(frames, ignore_index=True)
               for name, frames in collected.items()}
+    # The conformal bound is on an expectation, so it is checked across runs,
+    # not within one (see selective.check_guarantee).
+    if "coverage_risk_curve" in merged:
+        merged["guarantee_check"] = selective.check_guarantee(
+            merged["coverage_risk_curve"])
     if save:
         config.ensure_dirs()
         for name, table in merged.items():

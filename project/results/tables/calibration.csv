@@ -1,0 +1,2 @@
+dataset,architecture,seed,uq_method,ece,brier,mean_predicted,observed_rate,temperature
+support2,mlp,0,ensemble,0.09461532594938797,0.11867605894804001,0.35376614332199097,0.25915080308914185,0.9052901268005371

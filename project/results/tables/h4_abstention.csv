@@ -1,0 +1,2 @@
+dataset,architecture,seed,alpha,coverage,epistemic_delivered,epistemic_abstained,cliffs_delta
+support2,mlp,0,0.1,0.375,0.001035693334415555,0.0015997267328202724,0.13066666666666665

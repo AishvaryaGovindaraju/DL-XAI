@@ -322,6 +322,38 @@ def evaluate_policies(realised_risk_test: np.ndarray,
     return table
 
 
+def check_guarantee(curve_table: pd.DataFrame) -> pd.DataFrame:
+    """
+    Check the bound the way the theorem states it.
+
+    Conformal risk control guarantees E[L(lambda_hat)] <= alpha, where the
+    expectation runs over the calibration draw AND the test point. A single
+    run is one draw from that distribution, and because the correction term
+    (B - alpha)/n is small, a tight bound is exceeded in roughly half of
+    individual runs by construction. Judging validity from one run is a
+    misreading of the guarantee.
+
+    This aggregates realised population risk across runs (seeds, datasets,
+    architectures) and compares the MEAN against alpha, while also
+    reporting the per-run exceedance rate.
+    """
+    rows = []
+    for (dataset, alpha), group in curve_table.groupby(["dataset", "alpha"]):
+        realised = group["population_risk"].to_numpy(dtype=float)
+        rows.append({
+            "dataset": dataset,
+            "alpha": alpha,
+            "n_runs": len(realised),
+            "mean_population_risk": float(np.mean(realised)),
+            "se": float(np.std(realised, ddof=1) / np.sqrt(len(realised)))
+                  if len(realised) > 1 else np.nan,
+            "mean_coverage": float(group["coverage"].mean()),
+            "exceedance_rate": float(np.mean(realised > alpha)),
+            "bound_met_in_expectation": bool(np.mean(realised) <= alpha),
+        })
+    return pd.DataFrame(rows).sort_values(["dataset", "alpha"])
+
+
 def coverage_risk_curve(predicted_risk_test: np.ndarray,
                         realised_risk_test: np.ndarray,
                         predicted_risk_calib: np.ndarray,

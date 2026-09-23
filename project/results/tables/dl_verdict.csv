@@ -1,0 +1,2 @@
+dataset,best_deep,deep_roc_auc,best_shallow,shallow_roc_auc,difference,architecture,seed
+support2,mlp_ensemble,0.8969094035416806,logreg,0.9005660882963756,-0.00365668475469505,mlp,0

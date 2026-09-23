@@ -1,0 +1,6 @@
+ablation,variant,coverage,population_risk,selective_risk,n,spearman_rho,dataset,architecture,seed
+features,representation+uncertainty,0.375,0.11625,0.30999999999999994,40,0.7562444648304487,support2,mlp,0
+features,uncertainty_only,0.325,0.09906250000000001,0.3048076923076924,40,0.752394697875141,support2,mlp,0
+risk_weights,infidelity_heavy,,,0.43949999999999995,40,,support2,mlp,0
+risk_weights,instability_heavy,,,0.422875,40,,support2,mlp,0
+risk_weights,equal,,,0.4390625,40,,support2,mlp,0
